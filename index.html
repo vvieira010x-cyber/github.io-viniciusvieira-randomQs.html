@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Random Qs — powered by Ollama</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f11;
+      --surface: #1a1a1f;
+      --border: #2e2e38;
+      --accent: #7c6af7;
+      --accent-dim: #3d3580;
+      --text: #e2e2e8;
+      --muted: #6b6b78;
+      --error: #f76a6a;
+      --success: #6af7b4;
+      --radius: 12px;
+      --font: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p {
+      color: var(--muted);
+      margin-top: .4rem;
+      font-size: .95rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 680px;
+      margin-bottom: 1.25rem;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 1rem;
+    }
+
+    /* Config row */
+    .config-row {
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: .35rem;
+      flex: 1;
+      min-width: 140px;
+    }
+
+    label {
+      font-size: .82rem;
+      color: var(--muted);
+    }
+
+    input, select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: .5rem .75rem;
+      font-size: .9rem;
+      font-family: var(--font);
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    select option { background: var(--surface); }
+
+    /* Topic pills */
+    .topics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+
+    .topic-pill {
+      cursor: pointer;
+      padding: .35rem .85rem;
+      border-radius: 99px;
+      font-size: .85rem;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      transition: all .15s;
+      user-select: none;
+    }
+
+    .topic-pill:hover { border-color: var(--accent); color: var(--text); }
+    .topic-pill.active { background: var(--accent-dim); border-color: var(--accent); color: var(--text); }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .6rem 1.4rem;
+      border-radius: 8px;
+      font-size: .95rem;
+      font-family: var(--font);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      border: none;
+      outline: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) { background: #6655e0; }
+    .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .btn-ghost:hover { border-color: var(--accent); color: var(--text); }
+
+    .actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+
+    /* Question display */
+    #question-area {
+      min-height: 80px;
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+
+    #question-area.placeholder { color: var(--muted); font-style: italic; font-size: .95rem; }
+
+    .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1.1em;
+      background: var(--accent);
+      vertical-align: text-bottom;
+      animation: blink .7s step-end infinite;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Answer area */
+    #answer-wrap { display: none; }
+
+    #answer-text {
+      font-size: 1rem;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      min-height: 60px;
+    }
+
+    #answer-text.placeholder { color: var(--muted); font-style: italic; }
+
+    /* Status bar */
+    #status {
+      font-size: .82rem;
+      margin-top: .75rem;
+      min-height: 1.2em;
+    }
+
+    .status-ok { color: var(--success); }
+    .status-err { color: var(--error); }
+    .status-info { color: var(--muted); }
+
+    /* History */
+    #history-list { list-style: none; display: flex; flex-direction: column; gap: .6rem; }
+
+    #history-list li {
+      padding: .6rem .9rem;
+      border-radius: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      font-size: .88rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: .5rem;
+    }
+
+    #history-list li:hover { border-color: var(--accent); color: var(--text); }
+    #history-list li .q-text { flex: 1; }
+    #history-list li .q-tag { font-size: .75rem; background: var(--accent-dim); color: #c4beff; border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+
+    #history-empty { color: var(--muted); font-style: italic; font-size: .9rem; }
+
+    footer {
+      color: var(--muted);
+      font-size: .78rem;
+      text-align: center;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Random Qs</h1>
+  <p>AI-generated questions via your local Ollama instance</p>
+</header>
+
+<!-- Config -->
+<div class="card">
+  <h2>Ollama Settings</h2>
+  <div class="config-row">
+    <div class="field">
+      <label for="host">Host</label>
+      <input id="host" type="text" value="http://localhost:11434" />
+    </div>
+    <div class="field">
+      <label for="model">Model</label>
+      <input id="model" type="text" value="llama3" placeholder="llama3, mistral, gemma3…" />
+    </div>
+    <button class="btn btn-ghost" onclick="pingOllama()">Ping</button>
+  </div>
+  <div id="status" class="status-info">Not connected</div>
+</div>
+
+<!-- Topic picker -->
+<div class="card">
+  <h2>Topic</h2>
+  <div class="topics" id="topics">
+    <span class="topic-pill active" data-topic="general knowledge">General Knowledge</span>
+    <span class="topic-pill" data-topic="science">Science</span>
+    <span class="topic-pill" data-topic="history">History</span>
+    <span class="topic-pill" data-topic="technology">Technology</span>
+    <span class="topic-pill" data-topic="mathematics">Mathematics</span>
+    <span class="topic-pill" data-topic="philosophy">Philosophy</span>
+    <span class="topic-pill" data-topic="pop culture">Pop Culture</span>
+    <span class="topic-pill" data-topic="cybersecurity">Cybersecurity</span>
+  </div>
+</div>
+
+<!-- Question -->
+<div class="card">
+  <h2>Question</h2>
+  <div id="question-area" class="placeholder">Hit "Generate" to ask Ollama for a random question.</div>
+  <br/>
+  <div class="actions">
+    <button class="btn btn-primary" id="gen-btn" onclick="generateQuestion()">Generate</button>
+    <button class="btn btn-ghost" id="ans-btn" onclick="answerQuestion()" disabled>Answer it</button>
+    <button class="btn btn-ghost" onclick="copyText('question-area')">Copy</button>
+  </div>
+</div>
+
+<!-- Answer -->
+<div class="card" id="answer-wrap">
+  <h2>Answer</h2>
+  <div id="answer-text" class="placeholder">Waiting for your request…</div>
+</div>
+
+<!-- History -->
+<div class="card">
+  <h2>History</h2>
+  <ul id="history-list"><li id="history-empty">No questions yet.</li></ul>
+</div>
+
+<footer>Running entirely in your browser — Ollama must be reachable from this page.</footer>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let currentQuestion = '';
+  const history = [];
+  let selectedTopic = 'general knowledge';
+  let streaming = false;
+
+  // ── Topic pills ────────────────────────────────────────────────────────────
+  document.querySelectorAll('.topic-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.topic-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      selectedTopic = pill.dataset.topic;
+    });
+  });
+
+  // ── Ollama helpers ─────────────────────────────────────────────────────────
+  function host()  { return document.getElementById('host').value.replace(/\/$/, ''); }
+  function model() { return document.getElementById('model').value.trim() || 'llama3'; }
+
+  function setStatus(msg, type = 'info') {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = `status-${type}`;
+  }
+
+  async function pingOllama() {
+    setStatus('Pinging…', 'info');
+    try {
+      const r = await fetch(`${host()}/api/tags`, { signal: AbortSignal.timeout(4000) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      const models = (data.models || []).map(m => m.name).join(', ') || '(none)';
+      setStatus(`Connected — models: ${models}`, 'ok');
+    } catch (e) {
+      setStatus(`Cannot reach Ollama: ${e.message}`, 'err');
+    }
+  }
+
+  // Stream from /api/generate, calling onChunk(text) for each token
+  async function streamGenerate(prompt, onChunk, signal) {
+    const r = await fetch(`${host()}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: model(), prompt, stream: true }),
+      signal,
+    });
+
+    if (!r.ok) {
+      const err = await r.text();
+      throw new Error(`Ollama error ${r.status}: ${err}`);
+    }
+
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const obj = JSON.parse(line);
+          if (obj.response) onChunk(obj.response);
+          if (obj.done) return;
+        } catch { /* partial JSON — keep buffering */ }
+      }
+    }
+  }
+
+  // ── Generate question ──────────────────────────────────────────────────────
+  async function generateQuestion() {
+    if (streaming) return;
+    streaming = true;
+
+    const qArea = document.getElementById('question-area');
+    const genBtn = document.getElementById('gen-btn');
+    const ansBtn = document.getElementById('ans-btn');
+
+    qArea.classList.remove('placeholder');
+    genBtn.disabled = true;
+    ansBtn.disabled = true;
+    currentQuestion = '';
+
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    qArea.textContent = '';
+    qArea.appendChild(cursor);
+
+    const prompt =
+      `Generate a single interesting, thought-provoking question about ${selectedTopic}. ` +
+      `Output ONLY the question itself — no preamble, no numbering, no answer.`;
+
+    try {
+      await streamGenerate(prompt, chunk => {
+        currentQuestion += chunk;
+        qArea.textContent = currentQuestion;
+        qArea.appendChild(cursor);
+      }, AbortSignal.timeout(30000));
+
+      qArea.textContent = currentQuestion.trim();
+      currentQuestion = currentQuestion.trim();
+      ansBtn.disabled = false;
+      addToHistory(currentQuestion, selectedTopic);
+      setStatus('Question ready.', 'ok');
+    } catch (e) {
+      qArea.textContent = '';
+      qArea.classList.add('placeholder');
+      qArea.textContent = 'Error generating question.';
+      setStatus(e.message, 'err');
+    } finally {
+      genBtn.disabled = false;
+      streaming = false;
+    }
+  }
+
+  // ── Answer question ────────────────────────────────────────────────────────
+  async function answerQuestion() {
+    if (!currentQuestion || streaming) return;
+    streaming = true;
+
+    const wrap = document.getElementById('answer-wrap');
+    const aText = document.getElementById('answer-text');
+    const ansBtn = document.getElementById('ans-btn');
+
+    wrap.style.display = 'block';
+    aText.classList.remove('placeholder');
+    ansBtn.disabled = true;
+    let answer = '';
+
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    aText.textContent = '';
+    aText.appendChild(cursor);
+
+    const prompt =
+      `Answer the following question clearly and concisely:\n\n${currentQuestion}`;
+
+    try {
+      await streamGenerate(prompt, chunk => {
+        answer += chunk;
+        aText.textContent = answer;
+        aText.appendChild(cursor);
+      }, AbortSignal.timeout(60000));
+
+      aText.textContent = answer.trim();
+      setStatus('Answer ready.', 'ok');
+    } catch (e) {
+      aText.textContent = 'Error generating answer.';
+      setStatus(e.message, 'err');
+    } finally {
+      ansBtn.disabled = false;
+      streaming = false;
+    }
+  }
+
+  // ── History ────────────────────────────────────────────────────────────────
+  function addToHistory(q, topic) {
+    history.unshift({ q, topic });
+    if (history.length > 20) history.pop();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('history-list');
+    list.innerHTML = '';
+    if (!history.length) {
+      list.innerHTML = '<li id="history-empty">No questions yet.</li>';
+      return;
+    }
+    history.forEach(({ q, topic }) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="q-text">${escHtml(q)}</span><span class="q-tag">${escHtml(topic)}</span>`;
+      li.title = 'Click to reload this question';
+      li.addEventListener('click', () => {
+        currentQuestion = q;
+        const qArea = document.getElementById('question-area');
+        qArea.classList.remove('placeholder');
+        qArea.textContent = q;
+        document.getElementById('ans-btn').disabled = false;
+        document.getElementById('answer-wrap').style.display = 'none';
+      });
+      list.appendChild(li);
+    });
+  }
+
+  // ── Utilities ──────────────────────────────────────────────────────────────
+  function copyText(id) {
+    const text = document.getElementById(id).textContent;
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Auto-ping on load
+  pingOllama();
+</script>
+</body>
+</html>
