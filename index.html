@@ -263,7 +263,7 @@
       <label for="model">Model</label>
       <input id="model" type="text" value="llama3" placeholder="llama3, mistral, gemma3…" />
     </div>
-    <button class="btn btn-ghost" onclick="pingOllama()">Ping</button>
+    <button type="button" class="btn btn-ghost" onclick="pingOllama()">Ping</button>
   </div>
   <div id="status" class="status-info">Not connected</div>
 </div>
@@ -272,14 +272,14 @@
 <div class="card">
   <h2>Topic</h2>
   <div class="topics" id="topics">
-    <span class="topic-pill active" data-topic="general knowledge">General Knowledge</span>
-    <span class="topic-pill" data-topic="science">Science</span>
-    <span class="topic-pill" data-topic="history">History</span>
-    <span class="topic-pill" data-topic="technology">Technology</span>
-    <span class="topic-pill" data-topic="mathematics">Mathematics</span>
-    <span class="topic-pill" data-topic="philosophy">Philosophy</span>
-    <span class="topic-pill" data-topic="pop culture">Pop Culture</span>
-    <span class="topic-pill" data-topic="cybersecurity">Cybersecurity</span>
+    <button type="button" class="topic-pill active" data-topic="general knowledge">General Knowledge</button>
+    <button type="button" class="topic-pill" data-topic="science">Science</button>
+    <button type="button" class="topic-pill" data-topic="history">History</button>
+    <button type="button" class="topic-pill" data-topic="technology">Technology</button>
+    <button type="button" class="topic-pill" data-topic="mathematics">Mathematics</button>
+    <button type="button" class="topic-pill" data-topic="philosophy">Philosophy</button>
+    <button type="button" class="topic-pill" data-topic="pop culture">Pop Culture</button>
+    <button type="button" class="topic-pill" data-topic="cybersecurity">Cybersecurity</button>
   </div>
 </div>
 
@@ -289,9 +289,9 @@
   <div id="question-area" class="placeholder">Hit "Generate" to ask Ollama for a random question.</div>
   <br/>
   <div class="actions">
-    <button class="btn btn-primary" id="gen-btn" onclick="generateQuestion()">Generate</button>
-    <button class="btn btn-ghost" id="ans-btn" onclick="answerQuestion()" disabled>Answer it</button>
-    <button class="btn btn-ghost" onclick="copyText('question-area')">Copy</button>
+    <button type="button" class="btn btn-primary" id="gen-btn" onclick="generateQuestion()">Generate</button>
+    <button type="button" class="btn btn-ghost" id="ans-btn" onclick="answerQuestion()" disabled>Answer it</button>
+    <button type="button" class="btn btn-ghost" onclick="copyText('question-area')">Copy</button>
   </div>
 </div>
 
@@ -312,7 +312,7 @@
 <script>
   // ── State ──────────────────────────────────────────────────────────────────
   let currentQuestion = '';
-  const history = [];
+  const questionHistory = [];
   let selectedTopic = 'general knowledge';
   let streaming = false;
 
@@ -366,10 +366,7 @@
     const dec = new TextDecoder();
     let buf = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
+    const processLines = () => {
       const lines = buf.split('\n');
       buf = lines.pop();
       for (const line of lines) {
@@ -380,6 +377,16 @@
           if (obj.done) return;
         } catch { /* partial JSON — keep buffering */ }
       }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        if (buf.trim()) processLines();
+        break;
+      }
+      buf += dec.decode(value, { stream: true });
+      processLines();
     }
   }
 
@@ -416,10 +423,9 @@
       qArea.textContent = currentQuestion.trim();
       currentQuestion = currentQuestion.trim();
       ansBtn.disabled = false;
-      addToHistory(currentQuestion, selectedTopic);
+      addToQuestionHistory(currentQuestion, selectedTopic);
       setStatus('Question ready.', 'ok');
     } catch (e) {
-      qArea.textContent = '';
       qArea.classList.add('placeholder');
       qArea.textContent = 'Error generating question.';
       setStatus(e.message, 'err');
@@ -470,20 +476,20 @@
   }
 
   // ── History ────────────────────────────────────────────────────────────────
-  function addToHistory(q, topic) {
-    history.unshift({ q, topic });
-    if (history.length > 20) history.pop();
+  function addToQuestionHistory(q, topic) {
+    questionHistory.unshift({ q, topic });
+    if (questionHistory.length > 20) questionHistory.pop();
     renderHistory();
   }
 
   function renderHistory() {
     const list = document.getElementById('history-list');
     list.innerHTML = '';
-    if (!history.length) {
+    if (!questionHistory.length) {
       list.innerHTML = '<li id="history-empty">No questions yet.</li>';
       return;
     }
-    history.forEach(({ q, topic }) => {
+    questionHistory.forEach(({ q, topic }) => {
       const li = document.createElement('li');
       li.innerHTML = `<span class="q-text">${escHtml(q)}</span><span class="q-tag">${escHtml(topic)}</span>`;
       li.title = 'Click to reload this question';
@@ -501,8 +507,11 @@
 
   // ── Utilities ──────────────────────────────────────────────────────────────
   function copyText(id) {
-    const text = document.getElementById(id).textContent;
-    navigator.clipboard.writeText(text).catch(() => {});
+    const text = document.getElementById(id).textContent.trim();
+    if (!text) return;
+    navigator.clipboard.writeText(text)
+      .then(() => setStatus('Copied to clipboard.', 'ok'))
+      .catch(() => setStatus('Copy failed — check browser permissions.', 'err'));
   }
 
   function escHtml(s) {
